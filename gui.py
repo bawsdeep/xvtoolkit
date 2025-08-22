@@ -1,12 +1,14 @@
 import sys
 import io
+import os
+import platform
+import subprocess
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QLabel, QFileDialog, QTextEdit
+    QPushButton, QFileDialog, QTextEdit
 )
-from xv2tool import main as ps4_main  # PS4 encrypt/decrypt
+from xv2tool import main as ps4_main 
 from xv2_ps4topc import process_file as ps4pc_process_file
-from xv2savetool_switch import main as switch_main  # Switch/Xbox encrypt/decrypt
 
 
 class Xeno2GUI(QWidget):
@@ -16,38 +18,27 @@ class Xeno2GUI(QWidget):
         self.setGeometry(100, 100, 650, 450)
 
         self.file_path = None
-        self.is_decrypted = False
+        self.last_dir = os.path.expanduser("~")
 
         main_layout = QVBoxLayout()
 
-        # File label
-        self.label = QLabel("No file selected")
-        main_layout.addWidget(self.label)
-
-        # File selection button
-        self.select_button = QPushButton("Select File")
-        self.select_button.clicked.connect(self.select_file)
-        main_layout.addWidget(self.select_button)
-
-        # Horizontal layout for main buttons
         btn_layout = QHBoxLayout()
 
         # PS4 encrypt/decrypt
         self.ps4_decrypt_button = QPushButton("Decrypt/Encrypt PS4")
-        self.ps4_decrypt_button.clicked.connect(lambda: self._process_generic(ps4_main, "PS4"))
-        self.ps4_decrypt_button.setEnabled(False)
+        self.ps4_decrypt_button.clicked.connect(
+            lambda: self._select_and_process(ps4_main, "PS4")
+        )
         btn_layout.addWidget(self.ps4_decrypt_button)
 
-        # PS4 → PC conversion
-        self.ps4pc_button = QPushButton("PS4 → PC")
+        # PS4 ↔ PC conversion
+        self.ps4pc_button = QPushButton("PS4 ↔ PC")
         self.ps4pc_button.clicked.connect(self.process_ps4pc_file)
-        self.ps4pc_button.setEnabled(False)
         btn_layout.addWidget(self.ps4pc_button)
 
         # Switch/Xbox encrypt/decrypt
         self.switchxbox_button = QPushButton("Decrypt/Encrypt Switch/Xbox")
-        self.switchxbox_button.clicked.connect(lambda: self._process_generic(switch_main, "Switch/Xbox"))
-        self.switchxbox_button.setEnabled(False)
+        self.switchxbox_button.clicked.connect(self.process_switchxbox)
         btn_layout.addWidget(self.switchxbox_button)
 
         main_layout.addLayout(btn_layout)
@@ -82,33 +73,23 @@ class Xeno2GUI(QWidget):
             color: #f0f0f0;
             border: 1px solid #5c5c5c;
         }
-        QLabel {
-            font-weight: bold;
-        }
         """
         self.setStyleSheet(dark_style)
 
-    def select_file(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Select Save File")
+    def _select_file(self):
+        """Open file dialog and remember last used directory."""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select Save File", self.last_dir
+        )
         if file_path:
             self.file_path = file_path
-            self.label.setText(f"Selected: {file_path}")
-            self.ps4_decrypt_button.setEnabled(True)
-            self.ps4pc_button.setEnabled(True)
-            self.switchxbox_button.setEnabled(True)
+            self.last_dir = os.path.dirname(file_path)
+            return True
+        return False
 
-            # Check if file is decrypted by header
-            try:
-                with open(file_path, "rb") as f:
-                    header = f.read(4)
-                expected_header = bytes.fromhex("23 53 41 56")  # "#SAV"
-                self.is_decrypted = header == expected_header
-            except Exception:
-                self.is_decrypted = False
-
-    def _process_generic(self, func, platform_name):
-        """Unified encrypt/decrypt handling for PS4 and Switch/Xbox"""
-        if not self.file_path:
+    def _select_and_process(self, func, platform_name):
+        """Select file and run a processing function (PS4)."""
+        if not self._select_file():
             return
         self.log_box.clear()
 
@@ -116,10 +97,9 @@ class Xeno2GUI(QWidget):
         sys.stdout = buffer = io.StringIO()
 
         try:
-            output_path = func(self.file_path)  # assume func returns output path
+            output_path = func(self.file_path)
             if output_path:
                 self.file_path = output_path
-                self.label.setText(f"Wrote: {output_path}")
         except Exception as e:
             print(f"Error ({platform_name}): {e}")
 
@@ -127,23 +107,45 @@ class Xeno2GUI(QWidget):
         self.log_box.setPlainText(buffer.getvalue())
 
     def process_ps4pc_file(self):
-        """PS4 → PC conversion logic"""
-        if not self.file_path:
+        """PS4 ↔ PC conversion logic."""
+        if not self._select_file():
             return
         self.log_box.clear()
 
         try:
             result = ps4pc_process_file(self.file_path, mode="auto")
             log = (
-                f"{result['chosen']} → {result['output_path'].split('/')[-1]}\n"
+                f"{result['chosen']} ↔ {result['output_path'].split('/')[-1]}\n"
                 f"Input  SHA1: {result['input_sha1']}\n"
                 f"Output SHA1: {result['output_sha1']}\n"
             )
-            self.file_path = result['output_path']
-            self.label.setText(f"Wrote: {result['output_path']}")
+            self.file_path = result["output_path"]
             self.log_box.setPlainText(log)
         except Exception as e:
             self.log_box.setPlainText(f"Error: {e}")
+
+    def process_switchxbox(self):
+        """Run external Switch/Xbox binary (via Wine on Linux/macOS)."""
+        if not self._select_file():
+            return
+        self.log_box.clear()
+
+        exe_name = "xv2savdec_switch.exe"
+        if platform.system() in ["Linux", "Darwin"]:
+            cmd = ["wine", exe_name, self.file_path]
+        else:
+            cmd = [exe_name, self.file_path]
+
+        try:
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, cwd=self.last_dir
+            )
+            if result.stdout:
+                self.log_box.setPlainText(result.stdout)
+            if result.stderr:
+                self.log_box.append(f"Errors:\n{result.stderr}")
+        except Exception as e:
+            self.log_box.setPlainText(f"Error running {exe_name}: {e}")
 
 
 if __name__ == "__main__":
