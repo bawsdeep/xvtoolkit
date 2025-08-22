@@ -4,7 +4,7 @@ from glob import glob
 from PyInstaller.utils.hooks import collect_submodules
 
 root_dir = os.getcwd()
-scripts = [os.path.join(root_dir, "gui.py"), os.path.join(root_dir, "xv2tool.py"), os.path.join(root_dir, "xv2savetool_switch.py"), os.path.join(root_dir, "xv2_ps4topc.py")]
+scripts = [os.path.join(root_dir, "gui.py"), os.path.join(root_dir, "xv2tool.py"), os.path.join(root_dir, "xv2savdec_switch.exe"), os.path.join(root_dir, "xv2_ps4topc.py")]
 
 a = Analysis(
     scripts,
@@ -15,7 +15,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['README.md', '.github'],
+    excludes=['README.md', '.github', 'build.spec'],
     noarchive=False,
     optimize=0,
 )
