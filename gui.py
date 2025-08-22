@@ -41,6 +41,13 @@ class Xeno2GUI(QWidget):
         self.switchxbox_button.clicked.connect(self.process_switchxbox)
         btn_layout.addWidget(self.switchxbox_button)
 
+        # Ensure all buttons are same size
+        self._equalize_button_sizes([
+            self.ps4_decrypt_button, 
+            self.ps4pc_button, 
+            self.switchxbox_button
+        ])
+
         main_layout.addLayout(btn_layout)
 
         # Log box
@@ -63,7 +70,7 @@ class Xeno2GUI(QWidget):
             background-color: #3c3f41;
             border: 1px solid #5c5c5c;
             padding: 6px;
-            border-radius: 4px;
+            border-radius: 6px;
         }
         QPushButton:hover {
             background-color: #505357;
@@ -75,6 +82,13 @@ class Xeno2GUI(QWidget):
         }
         """
         self.setStyleSheet(dark_style)
+
+    def _equalize_button_sizes(self, buttons):
+        """Make all buttons the same size as the largest one."""
+        max_width = max(btn.sizeHint().width() for btn in buttons)
+        max_height = max(btn.sizeHint().height() for btn in buttons)
+        for btn in buttons:
+            btn.setMinimumSize(max_width, max_height)
 
     def _select_file(self):
         """Open file dialog and remember last used directory."""
