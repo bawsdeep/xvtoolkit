@@ -2,16 +2,32 @@
 import os
 from glob import glob
 from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.building.build_main import Analysis, PYZ, EXE
 
 root_dir = os.getcwd()
-scripts = [os.path.join(root_dir, "gui.py"), os.path.join(root_dir, "xv2tool.py"), os.path.join(root_dir, "xv2savdec_switch.exe"), os.path.join(root_dir, "xv2_ps4topc.py")]
 
+# Python scripts to compile
+scripts = [
+    os.path.join(root_dir, "gui.py"),
+    os.path.join(root_dir, "xv2tool.py"),
+    os.path.join(root_dir, "xv2_ps4topc.py")
+]
+
+# Include your existing .exe as a binary
+binaries = [
+    (os.path.join(root_dir, "xv2savdec_switch.exe"), ".")
+]
+
+# Hidden imports
+hiddenimports = collect_submodules('Crypto') + collect_submodules('PyQt5')
+
+# Analysis step
 a = Analysis(
     scripts,
     pathex=[root_dir],
-    binaries=[],
+    binaries=binaries,
     datas=[],
-    hiddenimports=collect_submodules('Crypto') + collect_submodules('PyQt5'),
+    hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -20,8 +36,10 @@ a = Analysis(
     optimize=0,
 )
 
+# Build the Python archive
 pyz = PYZ(a.pure)
 
+# Create the final EXE
 exe = EXE(
     pyz,
     a.scripts,
