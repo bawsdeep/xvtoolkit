@@ -3,6 +3,7 @@ import io
 import os
 import platform
 import subprocess
+import shutil
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QFileDialog, QTextEdit
@@ -145,7 +146,14 @@ class Xeno2GUI(QWidget):
         self.log_box.clear()
 
         exe_name = "xv2savdec_switch.exe"
+
         if platform.system() in ["Linux", "Darwin"]:
+            if not shutil.which("wine"):
+                self.log_box.setPlainText(
+                    "Wine is required to run the Switch/Xbox tool on this OS.\n"
+                    "Please install Wine and try again."
+                )
+                return
             cmd = ["wine", exe_name, self.file_path]
         else:
             cmd = [exe_name, self.file_path]
